@@ -1,0 +1,25 @@
+{
+    "google_auth": {
+        "scope": {
+            "appendonly": "https://www.googleapis.com/auth/photoslibrary.appendonly"
+        },
+        "file_path": {
+            "client_secret_file": "client_secret.json",
+            "token_file": "token.json"
+        },
+        "google_api": {
+            "validate_token_url": "https://www.googleapis.com/oauth2/v3/tokeninfo?access_token={token}",
+            "media_upload_url": "https://photoslibrary.googleapis.com/v1/uploads",
+            "media_create_url": "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate"
+        }
+    },
+    "album_id": "",
+    "tool": {
+        "ffmpeg": "./ffmpeg-7.1.1/bin/ffmpeg.exe",
+        "ffprobe": "./ffmpeg-7.1.1/bin/ffprobe.exe",
+        "exiftool": "./exiftool-13.30_64/exiftool.exe",
+        "config": {
+            "exiftool_config": "./.exiftool_config"
+        }
+    }
+}

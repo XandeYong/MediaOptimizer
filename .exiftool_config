@@ -1,0 +1,57 @@
+%Image::ExifTool::UserDefined = (
+    'Image::ExifTool::XMP::Main' => {
+        MediaOptimizer => {
+            Namespace => 'mediaoptimizer',
+            SubDirectory => {
+                TagTable => 'Image::ExifTool::MediaOptimizer::mediaoptimizer',
+            },
+        },
+    },
+);
+
+%Image::ExifTool::MediaOptimizer::mediaoptimizer = (
+    GROUPS => { 0 => 'XMP', 1 => 'XMP-mediaoptimizer', 2 => 'Other' },
+    NAMESPACE => { 'mediaoptimizer' => 'https://xandeyong.github.io/project/mediaoptimizer/ns/1.0/' },
+    WRITABLE => 'string',
+    Optimizer_Toolkit => {
+        Name => 'Optimizer_Toolkit',
+        Writable => 'string'
+    },
+    Optimizer_Version => {
+        Name => 'Optimizer_Version',
+        Writable => 'string'
+    },
+    Optimize_Date => {
+        Name => 'Optimize_Date',
+        Writable => 'string'
+    },
+    Optimize => {
+        Name => 'Optimize',
+        Writable => 'string'
+    },
+    Optimize_Tool => {
+        Name => 'Optimize_Tool',
+        Writable => 'string'
+    },
+    Input_Format => {
+        Name => 'Input_Format',
+        Writable => 'string'
+    },
+    Output_Format => {
+        Name => 'Output_Format',
+        Writable => 'string'
+    },
+    Original_Size => {
+        Name => 'Original_Size',
+        Writable => 'integer'
+    },
+    Optimized_Size => {
+        Name => 'Optimized_Size',
+        Writable => 'integer'
+    },
+    Size_Reduction_Percent => {
+        Name => 'Size_Reduction_Percent',
+        Writable => 'real'
+    }
+);
+1;  # end of config
