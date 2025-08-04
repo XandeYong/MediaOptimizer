@@ -1,21 +1,49 @@
 import argparse
 import json
+import sys
+from pydantic import ValidationError
 from dependency_injector import containers, providers
 from classes.google_auth import GoogleAuth
-from classes.tools import Tools
+from classes.tools import Tool
+from classes.argument import Argument
 from classes.path_manager import PathManager
 from components.google_api_manager import GoogleAPIManager
 from components.media_optimizer import MediaOptimizer
 from components.file_manager import FileManager
 
 # Args handling
-parser = argparse.ArgumentParser()
-parser.add_argument("--mode", type=str, help="Operation Mode (Default: Manual)")
-parser.add_argument("--path", type=str, help="Provide the folder path to skip the interaction with the console")
+parser = argparse.ArgumentParser(description="MediaOptimizer settings")
+parser.add_argument("-n", "--name", type=str, default="Manual", help="Operation name (default: 'Manual')")
+parser.add_argument("-s", "--source", type=str, help="Source folder path (skips manual input)")
+parser.add_argument("-iq", "--image_quality", type=int, help="Image quality (int value, depends on selected codec)")
+parser.add_argument("-vq", "--video_quality", type=int, help="Video quality (int value, depends on selected codec)")
+parser.add_argument("-iof", "--image_output_format", type=str, help="Image output format or codec (jpg, heif, libaom-av1)")
+parser.add_argument("-vof", "--video_output_format", type=str, help="Video output format or codec (mp4, mkv, mov, libx265)")
+parser.add_argument("-m", "--media", type=str, choices=["image", "video"], help="Only process specified media type")
+parser.add_argument("-e", "--extension", type=str, help='Only process files with specified extensions (e.g., "jpg;png;mp4")')
+parser.add_argument("-k", "--keep_temp", action="store_true", help='Keep temp files instead of deleting them after execution (large files in png format)')
+parser.add_argument("-r", "--allow_reprocess", action="store_true", help='Allow reprocessing files that are previously completed or flagged')
 args = parser.parse_args()
 
-mode = args.mode or "Manual"
-user_input = args.path or None
+
+try:
+    args_model = Argument(
+        name = args.name,
+        source = args.source,
+        image_quality = args.image_quality,
+        video_quality = args.video_quality,
+        image_output_format = args.image_output_format,
+        video_output_format = args.video_output_format,
+        media = args.media,
+        extension = args.extension.split(';') if isinstance(args.extension, str) else args.extension,
+        keep_temp = args.keep_temp,
+        allow_reprocess = args.allow_reprocess
+    )
+except ValidationError as e:
+    print(e)
+    print(e.json(indent=2))
+    sys.exit(1)
+
 
 # Configuration
 config: str
@@ -23,17 +51,18 @@ with open('config.json', 'r') as file:
     config = json.load(file)
 
 google_auth = GoogleAuth(**config['google_auth'])
-tools = Tools(**config['tool'])
+tools = Tool(**config['tool'])
 
 
 # File Generation
-folder_path = FileManager.generate_folder_structure(name=mode)
+folder_path = FileManager.generate_folder_structure(name=args.name)
 log_file = FileManager.generate_file("log", folder_path, extension="txt")
 failed_file = FileManager.generate_file("fail", folder_path, extension="txt")
 failed_media_folder = FileManager.generate_folder_single("failed_media", folder_path)
+temp_media_folder = FileManager.generate_folder_single("temp_media", folder_path)
 optimized_media_folder = FileManager.generate_folder_single("optimized_media", folder_path)
 raw_media_folder = FileManager.generate_folder_single("raw_media", folder_path)
-path_manager = PathManager(folder_path, log_file, failed_file, failed_media_folder, optimized_media_folder, raw_media_folder)
+path_manager = PathManager(folder_path, log_file, failed_file, failed_media_folder, temp_media_folder, optimized_media_folder, raw_media_folder)
 
 # Init Manager
 google_api_manager = GoogleAPIManager(
@@ -62,7 +91,8 @@ class Container(containers.DeclarativeContainer):
     google_api_manager = providers.Singleton(GoogleAPIManager)
     media_optimizer = providers.Singleton(MediaOptimizer)
     google_auth = providers.Singleton(GoogleAuth)
-    tools = providers.Singleton(Tools)
+    tools = providers.Singleton(Tool)
+    args = providers.Singleton(Argument)
 
 container = Container()
 container.path_manager = path_manager
@@ -70,3 +100,4 @@ container.google_api_manager = google_api_manager
 container.media_optimizer = media_optimizer
 container.google_auth = google_auth
 container.tools = tools
+container.args = args_model

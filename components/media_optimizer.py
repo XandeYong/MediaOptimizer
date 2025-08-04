@@ -77,7 +77,7 @@ class MediaOptimizer:
         
         return data.get(tag)
 
-    def replace_metadata(self, input_path, output_path):
+    def replace_metadata(self, from_file, to_file):
         """
         Copies all metadata (EXIF, IPTC, GPS, etc.) from an input image to an output JPEG.
 
@@ -85,51 +85,59 @@ class MediaOptimizer:
         to the optimized/compressed image (output_path), and overwrites the output's existing metadata.
 
         Args:
-            input_path (str): Path to the source image containing the desired metadata.
-            output_path (str): Path to the image that should receive the metadata. If None,
+            from_file (str): Path to the source image containing the desired metadata.
+            to_file (str): Path to the image that should receive the metadata. If None,
                             defaults to the same name as input_path but with a .jpg extension.
 
-        Returns:
-            str: Final path of the image with metadata applied.
         """
 
         cmd = [
             self._exiftool,              # Path to exiftool binary (e.g., "/usr/bin/exiftool")
-            "-TagsFromFile", input_path, # Copy all metadata from input file
+            "-TagsFromFile", from_file,  # Copy all metadata from input file
             "-all:all",                  # Copy all groups of metadata (EXIF, IPTC, XMP, etc.)
             "-overwrite_original",       # Overwrite output image's original metadata
-            output_path                  # File to receive the metadata
+            to_file                      # File to receive the metadata
         ]
         subprocess.run(cmd, check=True)
     #endregion
     
     #region Optimize Image
-    def optimize_to_jpeg(self, input_path, mime_type, output_path=None, quality=4, metadata=True):
+    def optimize_image(self, input_path: str, output_path:str = None, qvb: int = 4, crf: int = 30, codec="libaom-av1"):
         """
         Converts an image to optimized JPEG using FFmpeg.
         
         Args:
             input_path (str): Path to the input image.
+            mime_type (str): Image mimetype.
             output_path (str, optional): Path to save the JPEG. Defaults to input file name with .jpg.
-            quality (int): JPEG quality (1=best, 31=worst). Lower is better.
+            qvb (int): Quality for Variable Bitrate, simpler codecs quality (1=best, 31=worst). Lower is better, 4 is reasonable.
+            crf (int): Constant Rate Factor, modern codecs quality (0=best, 63=worst). Lower is better, 30 is reasonable
+            codec (str): can study ffmpeg codec list to choose codec of your liking. Suggest mjpeg or libaom-av1 for smallest file size (Default: libaom-av1)
             metadata (bool): Keep metadata (True to keep previous image's metadata, False to let it be).
         """
-
-        output_path = os.path.splitext(output_path or input_path)[0] + ".jpg"
+        ext = ".jpg" if codec == "mjpeg" else ".avif"
+        output_path = os.path.splitext(output_path or input_path)[0] + ext
 
         cmd = [
             self._ffmpeg,
             "-y",                    # Overwrite output without asking
             "-i", input_path,        # Input file
-            "-q:v", str(quality),    # Set JPEG quality
-            "-frames:v", "1",        # Force format
             "-map_metadata", "0",    # Keep original metadata
-            "-c:v", "mjpeg",         # Output as jpeg
+            "-c:v", codec,           # Output format
             "-update", "1",          # overwrite the output file if it exists (used for image outputs)
         ]
 
-        if mime_type == "image/heic" or mime_type == "image/heif":
-            cmd += ["-map", "0:v:0"] # selects the full-resolution video/image stream
+        modern_codecs = {"libaom-av1", "libsvtav1", "libx264", "libx265"}
+        if codec in modern_codecs:
+            cmd += [
+                "-crf", str(crf),         # Constant Rate Factor (quality)
+                "-still-picture", "1",    # AVIF required standards compliance
+            ]    
+        else:
+            cmd += [
+                "-q:v", str(qvb),         # Quality for Variable Bitrate (quality)
+                "-frames:v", "1",         # Force format
+            ]
 
         cmd += [output_path]         # Output file
 
@@ -138,8 +146,6 @@ class MediaOptimizer:
         subprocess.run(cmd, check=True)
         os.utime(output_path, (mod_time, mod_time))
 
-        if metadata:
-            self.replace_metadata(input_path, output_path)
         return output_path
 
     # Get progress bar
@@ -161,12 +167,12 @@ class MediaOptimizer:
     #endregion
 
     #region Optimize Video
-    def optimize_to_mp4(self, 
+    def optimize_video(self, 
         input_path: str,
         output_path: str = None,
         crf: int = None,
         preset: str = "slow",
-        codex: str = "libx265",
+        codec: str = "libx265",
         audio_bitrate: str = "128k",
         scale_resolution: str = None,
         streaming: bool = False,
@@ -212,7 +218,7 @@ class MediaOptimizer:
             output_path = f"{base}.mp4"
 
         if crf is None:
-            crf = CRF_265 if codex == 'libx265' else CRF_264
+            crf = CRF_265 if codec == 'libx265' else CRF_264
         elif not (0 <= crf <= 51):
             raise ValueError("CRF must be an integer between 0 and 51.")
 
@@ -224,7 +230,7 @@ class MediaOptimizer:
             self._ffmpeg,
             "-y",                    # Overwrite output
             "-i", input_path,        # Input file
-            "-c:v", codex,           # Set Video quality
+            "-c:v", codec,           # Set Video quality
             "-preset", preset,       # processing efficency (the slower the better result)
             "-crf", str(crf),        # Set video frame rate
             "-map_metadata", "0",    # Keep original metadata

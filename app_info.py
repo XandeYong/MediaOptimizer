@@ -1,5 +1,5 @@
 APP_NAME = "Media Optimizer"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 BUILD_DATE = "2025-07-18T10:00:00Z"
 AUTHOR = "XandeYong"
 
@@ -25,8 +25,13 @@ ENVIRONMENT = {
 1.0.0
 - Created MediaOptimizer
 
-1.0.1 (Future release)
-- Async version of optimizer part
+1.0.1 
 - AVIF support
+- HEIF support
+- Introduced 10 arguments (-h to study them)
+
+1.0.2 (Future release)
+- Publish to Google Photos
+- Async version of optimizer part
 
 """

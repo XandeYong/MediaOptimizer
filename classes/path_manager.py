@@ -1,9 +1,10 @@
 class PathManager:
-    def __init__(self, root, log, failed_log, failed_media, optimized_media, raw_media):
+    def __init__(self, root, log, failed_log, failed_media, temp_media, optimized_media, raw_media):
         self._root: str = root
         self._log: str = log
         self._failed_log: str = failed_log
         self._failed_media: str = failed_media
+        self._temp_media: str = temp_media
         self._optimized_media: str = optimized_media
         self._raw_media: str = raw_media
 
@@ -12,6 +13,7 @@ class PathManager:
         log={self._log}\n
         failed_log={self._failed_log}\n
         failed_media={self._failed_media}\n
+        temp_media={self._temp_media}\n
         optimized_media={self._optimized_media}\n
         raw_media={self._raw_media}"""
 
@@ -30,6 +32,10 @@ class PathManager:
     @property
     def failed_media(self):
         return self._failed_media
+    
+    @property
+    def temp_media(self):
+        return self._temp_media
 
     @property
     def optimized_media(self):

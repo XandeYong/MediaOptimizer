@@ -13,9 +13,11 @@
 MEDIA_MIME_TYPES = {
     # Image formats
     "image/jpeg": ".jpg",
+    "image/jxl": ".jxl",
     "image/png": ".png",
     "image/heic": ".HEIC",
     "image/heif": ".HEIF",
+    "image/avif": ".avif",
     "image/gif": ".gif",
     "image/bmp": ".bmp",
     "image/webp": ".webp",

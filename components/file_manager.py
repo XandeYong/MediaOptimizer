@@ -76,7 +76,7 @@ class FileManager:
         return folder
 
     @staticmethod
-    def collect_media_files(root_dir: Path, image_exts=None, video_exts=None):
+    def collect_media_files(root_dir: Path, image_exts=None, video_exts=None, media=None):
         """
         Recursively scans a folder for image and video files.
 
@@ -84,19 +84,22 @@ class FileManager:
             root_dir (Path): The root directory to scan.
             image_exts (list[str], optional): Allowed image file extensions.
             video_exts (list[str], optional): Allowed video file extensions.
+            media (str): Declare what type of media should be process (image / video).
 
         Returns:
             media_files (list[Path]): List of media file paths found.
             image_count (int): number of image found.
             video_count (int): number of video found.
         """
+        media = (media or "").lower()
+
         if image_exts is None:
             image_exts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff']
         if video_exts is None:
             video_exts = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv', '.m4v']
 
-        image_exts = set([ext.lower() for ext in image_exts])
-        video_exts = set([ext.lower() for ext in video_exts])
+        image_exts = set([ext.lower() for ext in image_exts]) if media in ("", "image") else set()
+        video_exts = set([ext.lower() for ext in video_exts]) if media in ("", "video") else set()
 
         image_count = 0
         video_count = 0
@@ -114,12 +117,5 @@ class FileManager:
                 image_count += found(file_path)
             elif ext in video_exts:
                 video_count += found(file_path)
-
-        # allowed_exts = set(ext.lower() for ext in image_exts + video_exts)
-        # return [
-        #     file_path
-        #     for file_path in root_dir.rglob('*')
-        #     if file_path.is_file() and file_path.suffix.lower() in allowed_exts
-        # ]
 
         return media_files, image_count, video_count

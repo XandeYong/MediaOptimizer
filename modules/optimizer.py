@@ -9,28 +9,34 @@ from datetime import datetime, UTC
 from pathlib import Path
 from PIL import Image
 from main import container
+from classes.argument import Argument
 from classes.path_manager import PathManager
 from components.media_optimizer import MediaOptimizer
 from components.my_logging import log_message
 from helper.timespan_logger import TimeSpanLogger
+from constants.media_mime_types import MEDIA_MIME_TYPES
 
 
 # Injecting dependency
+args: Argument = container.args
 path_manager: PathManager = container.path_manager
 media_optimizer: MediaOptimizer = container.media_optimizer
 
 # Register HEIF support with Pillow
 pillow_heif.register_heif_opener()
+pillow_heif.register_avif_opener()
 
 # file to skip (optimizing raw image is pointless, why take raw image in the first place)
 skip = ["image/tiff"]
+image_codec = args.image_output_format or "libaom-av1"
+video_codec = args.video_output_format or "libx265"
 
 # Optimize media
-def _optimize(input_file: str, output_file: str, media_format: str, mime_type: str = None):
+def _optimize(input_file: str, output_file: str, media_format: str):
     if media_format == "image":
-        return media_optimizer.optimize_to_jpeg(input_file, mime_type, output_file) # need to pass in ext (for HEIC verification)
+        return media_optimizer.optimize_image(input_file, output_file, codec=image_codec)
     elif media_format == "video":
-        return media_optimizer.optimize_to_mp4(input_file, output_file)
+        return media_optimizer.optimize_video(input_file, output_file, codec=video_codec)
     else:
         raise TypeError(f"Media Format is not supported: {media_format}.")
 
@@ -39,20 +45,21 @@ def _verify(media_path: Path):
     # Verify media type (Image/Video)
     #mime = magic(mime=True).from_file(str(media_file_path))
     mime: str = magic.from_file(str(media_path), mime=True)
+    ext: str = os.path.splitext(media_path)[-1]
 
     if mime == "application/octet-stream" or mime == "inode/blockdevice":
         mime = media_optimizer.get_mime_type(media_path)
 
     for m in skip:
         if mime == m:
-            return "raw", mime, os.path.splitext(media_path)[-1]
+            return "raw", mime, ext
 
     if mime.startswith("image"):
         # try image
         try:
             image = Image.open(media_path)
             image.close()
-            return "image", mime, os.path.splitext(media_path)[-1]
+            return "image", mime, ext
         except Exception as e:
             raise RuntimeError(e)
     
@@ -63,13 +70,19 @@ def _verify(media_path: Path):
             if not video.isOpened():
                 raise ValueError("Cannot open video file")
             video.release()
-            return "video", mime, os.path.splitext(media_path)[-1]
+            return "video", mime, ext
         except Exception as e:
             raise RuntimeError(e)
 
     raise ValueError(f"Unsupported MIME type: [{mime}]")
 
-
+# Generate temp media
+def _generate_temp_media(media: str, mime_type: str):
+    temp = str(path_manager.temp_media / os.path.splitext(media.name)[0]) + MEDIA_MIME_TYPES[mime_type]
+    img = Image.open(media)
+    img.save(temp, mime_type.split("/")[1], quality=100)
+    temp = Path(temp)
+    return temp
 
 # Optimizer
 def process_medias(files: list[Path]):
@@ -97,19 +110,33 @@ def process_medias(files: list[Path]):
                 shutil.copy2(media, path_manager.raw_media)
                 continue
 
-            # Verify processed?
-            google_id: str = media_optimizer.read_custom_xmp_tag(media.absolute(), "MediaOptimizer", "Optimizer_Toolkit")
-            if (google_id):
+            # Verify reprocessing file
+            if not args.allow_reprocess and media_optimizer.read_custom_xmp_tag(media.absolute(), "MediaOptimizer", "Optimizer_Toolkit"):
                 raise RecursionError(f"Media have been optimized before.")
-            google_id = media.name.split(".")[0]
 
+            # HEIF handling (tile grid (image collection))
+            temp = None
+            if mime_type in {"image/heic", "image/heif"}:
+                log_message(f"[{guid}] Generating temp file...", path_manager.log)
+                temp = _generate_temp_media(media.absolute(), "image/png")
+        
             # Optimize the media
             log_message(f"[{guid}] Optimizing media...", path_manager.log)
             pre_output: str = path_manager.optimized_media / media.name
-            output_path = Path(_optimize(media.absolute(), pre_output, media_format, mime_type))
+            output_path = Path(_optimize(temp.absolute() if temp else media.absolute(), pre_output, media_format))
             log_message(f"[{guid}] Optimized. output: [{output_path}]", path_manager.log)
 
+            # Clean temp file
+            if not args.keep_temp and temp and temp.exists():
+                log_message(f"[{guid}] Cleanning temp file...", path_manager.log)
+                temp.unlink()
+
+            # Recover metadata
+            log_message(f"[{guid}] Recover metadata...", path_manager.log)
+            media_optimizer.replace_metadata(media.absolute(), output_path.absolute())
+
             # Verify proficiency
+            log_message(f"[{guid}] Verifying optimization proficiency...", path_manager.log)
             original_size = media.stat().st_size
             optimized_size = output_path.stat().st_size
             reduction_percentage = ((original_size - optimized_size) / original_size) * 100
