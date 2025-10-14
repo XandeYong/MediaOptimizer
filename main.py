@@ -46,6 +46,7 @@ if __name__ == "__main__":
     try:
         log_message(f"Log file path: {path_manager.log}", path_manager.log)
         log_message(f"Fail file path: {path_manager.failed_log}", path_manager.log)
+        log_message(f"Args: {args.model_dump_json()}", path_manager.log)
 
         # Perform Download
         # from modules.download_files import google_download
@@ -54,7 +55,7 @@ if __name__ == "__main__":
         source = args.source
         if source is None:
             source = input("Enter the folder path: ")
-        log_message(f"User Input: {source}", path_manager.log)
+        log_message(f"Source: {source}", path_manager.log)
         
         # Filter media
         image_ext, video_ext = sort_ext(args.extension)

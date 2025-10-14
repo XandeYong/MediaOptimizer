@@ -11,6 +11,7 @@ class MediaOptimizer:
         self._ffprobe:str = ffprobe
         self._exiftool:str = exiftool
         self._xmp_config:str = xmp_config
+        self._subprocess:subprocess
 
     #region Loader
     def load_executable(self, ffmpeg=None, ffprobe=None, exiftool=None):
@@ -45,8 +46,32 @@ class MediaOptimizer:
             if line.startswith("MIME Type"):
                 return line.split(":", 1)[1].strip()
         return None
+    
+    def ffmpeg_set_media_metadata(self, media: Path, output_path, metadatas: dict[str, str]):
+        if metadatas:
+            cmd = [
+                self._ffmpeg,
+                "-i", media,
+                "-c", "copy"
+            ]
 
-    def set_media_metadata(self, filepath: Path, namespace: str, metadatas: dict[str, str], xmp_config: bool=False):
+            for tag, value in metadatas.items():
+                cmd.extend(['-metadata', f"{tag}=\"{value}\""])  #-metadata Optimizer_Toolkit="Media Optimizer"
+
+            cmd.extend([
+                output_path
+            ])
+
+            print(cmd)
+
+            process = subprocess.Popen(cmd)
+            self._subprocess = process
+            process.wait()
+
+            return True if process.returncode == 0 else False
+        return None
+    
+    def exiftool_set_media_metadata(self, media: Path, namespace: str, metadatas: dict[str, str], xmp_config: bool=False):
         if metadatas:
             cmd = [
                 self._exiftool,
@@ -54,11 +79,11 @@ class MediaOptimizer:
             ]
             
             for tag, value in metadatas.items():
-                cmd.append(f"-XMP-{namespace}:{tag}={value}")  #-XMP-ID:Google_ID
+                cmd.append(f"-XMP-{namespace}:{tag}={value}")  #-XMP-mediaoptimizer:Optimizer_Toolkit=Media Optimizer
             
             cmd.extend([
                 "-overwrite_original",
-                str(filepath)
+                str(media)
             ])
 
             result = subprocess.run(cmd, check=True)
@@ -102,7 +127,7 @@ class MediaOptimizer:
     #endregion
     
     #region Optimize Image
-    def optimize_image(self, input_path: str, output_path:str = None, qvb: int = 4, crf: int = 30, codec="libaom-av1"):
+    def optimize_image(self, input_path: str, output_path:str, qvb: int = 4, crf: int = 30, codec="libaom-av1", multiple_frame = False):
         """
         Converts an image to optimized JPEG using FFmpeg.
         
@@ -114,9 +139,8 @@ class MediaOptimizer:
             crf (int): Constant Rate Factor, modern codecs quality (0=best, 63=worst). Lower is better, 30 is reasonable
             codec (str): can study ffmpeg codec list to choose codec of your liking. Suggest mjpeg or libaom-av1 for smallest file size (Default: libaom-av1)
             metadata (bool): Keep metadata (True to keep previous image's metadata, False to let it be).
+            multiple_frame (bool): Indicator for whether the image has multiple frames like (.gif) required to loop the frame or just single frames
         """
-        ext = ".jpg" if codec == "mjpeg" else ".avif"
-        output_path = os.path.splitext(output_path or input_path)[0] + ext
 
         cmd = [
             self._ffmpeg,
@@ -139,11 +163,18 @@ class MediaOptimizer:
                 "-frames:v", "1",         # Force format
             ]
 
+        if multiple_frame:
+            cmd += ["-plays", "0",]       # loops infinitely
+
         cmd += [output_path]         # Output file
 
         mod_time = os.path.getmtime(input_path)
 
-        subprocess.run(cmd, check=True)
+        process = subprocess.Popen(cmd)
+        self._subprocess = process
+        process.wait()
+
+        # subprocess.run(cmd, check=True)
         os.utime(output_path, (mod_time, mod_time))
 
         return output_path
@@ -169,7 +200,7 @@ class MediaOptimizer:
     #region Optimize Video
     def optimize_video(self, 
         input_path: str,
-        output_path: str = None,
+        output_path: str,
         crf: int = None,
         preset: str = "slow",
         codec: str = "libx265",
@@ -183,7 +214,7 @@ class MediaOptimizer:
 
         Args:
             input_path (str): Full path to the input video file.
-            output_path (str): Path to save optimized video. If None, appends '_optimized.mp4' to input filename.
+            output_path (str): Path to save optimized video.
             crf (int): Constant Rate Factor Profile, Default value will based on codex ('libx264' = 23, 'libx265' = 26). 
                        CRF (lower = better quality, bigger size). Recommended: 18–28.
             preset (str): Encoding speed vs compression efficiency.
@@ -209,13 +240,6 @@ class MediaOptimizer:
 
         if not os.path.isfile(input_path):
             raise FileNotFoundError(f"Input file not found: {input_path}")
-        
-        base, ext = os.path.splitext(output_path or input_path)
-        if output_path is None:
-            output_path = f"{base}_optimized.mp4"
-
-        if ext != ".mp4":
-            output_path = f"{base}.mp4"
 
         if crf is None:
             crf = CRF_265 if codec == 'libx265' else CRF_264
@@ -233,6 +257,7 @@ class MediaOptimizer:
             "-c:v", codec,           # Set Video quality
             "-preset", preset,       # processing efficency (the slower the better result)
             "-crf", str(crf),        # Set video frame rate
+            "-map", "0",             # Ensures all streams (video, audio, subtitles, etc.) are included.
             "-map_metadata", "0",    # Keep original metadata
         ]
 
@@ -255,7 +280,7 @@ class MediaOptimizer:
         # Set output location
         cmd.append(output_path)
 
-        print()
+        # print(cmd)
 
         # Run FFmpeg and parse progress
         process = subprocess.Popen(
@@ -265,6 +290,7 @@ class MediaOptimizer:
             universal_newlines=True,
             bufsize=1
         )
+        self._subprocess = process
 
         time_pattern = re.compile(r"time=(\d+):(\d+):(\d+).(\d+)")
         pbar = tqdm(total=total_duration, unit="s", desc="Encoding")
@@ -284,9 +310,6 @@ class MediaOptimizer:
         
         if process.returncode != 0:
             raise RuntimeError(f"FFmpeg failed:\n{line}")
-        
-        if metadata:
-            self.replace_metadata(input_path, output_path)
 
         return output_path
     #endregion

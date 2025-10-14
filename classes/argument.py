@@ -12,3 +12,4 @@ class Argument(BaseModel):
     extension: Optional[List[str]] = None
     keep_temp: bool
     allow_reprocess: bool
+    retry_failed: bool

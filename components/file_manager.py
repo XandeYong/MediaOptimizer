@@ -119,3 +119,11 @@ class FileManager:
                 video_count += found(file_path)
 
         return media_files, image_count, video_count
+
+    @staticmethod
+    def delete_file(file: Path):
+        try:
+            file.unlink(missing_ok=True)
+            return True, "Success"
+        except Exception as e:
+            return False, str(e)

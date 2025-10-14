@@ -1,13 +1,22 @@
 """
-    MEDIA_MIME_TYPES (Media Multipurpose-Internet-Mail-Extensions type) is a standard meta-data information for files
-    to be recognize by system. 
+    MEDIA_MIME_TYPES defines the mapping between MIME types and their corresponding file extensions.
 
-    MIME type stands for Multipurpose Internet Mail Extensions type. 
-    It's a standardized way to indicate the nature and format of a file — originally designed for email, 
-    but now used everywhere (web, file uploads, APIs, etc.).
+    A *MIME type* (Multipurpose Internet Mail Extensions type) is a standardized identifier that 
+    indicates the nature and format of a file. Originally created for email attachments, MIME types 
+    are now widely used across operating systems, web servers, APIs, and file management systems 
+    to classify and handle files appropriately.
 
-    Specifies and identify the MINE type for a file allow the system to recognize 
-    and perform read-write action on the selected file to its full extent.
+    This mapping establishes the relationship between MIME identifiers (e.g., "image/jpeg", "video/mp4") 
+    and file extensions (e.g., ".jpg", ".mp4"). 
+
+    It allows the system to:
+      - Recognize the type of media being processed.
+      - Infer correct file extensions when encoding or saving files.
+      - Ensure consistent file type detection across different platforms and workflows.
+      - Support automated media-type handling in optimization, transcoding, and metadata operations.
+
+    In short, MEDIA_MIME_TYPES standardizes MIME-to-filetype associations, enabling 
+    reliable file recognition, consistent naming, and smooth interoperability across media systems.
 """
 # All Media Types
 MEDIA_MIME_TYPES = {
