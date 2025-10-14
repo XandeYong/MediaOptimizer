@@ -17,12 +17,13 @@ parser.add_argument("-n", "--name", type=str, default="Manual", help="Operation 
 parser.add_argument("-s", "--source", type=str, help="Source folder path (skips manual input)")
 parser.add_argument("-iq", "--image_quality", type=int, help="Image quality (int value, depends on selected codec)")
 parser.add_argument("-vq", "--video_quality", type=int, help="Video quality (int value, depends on selected codec)")
-parser.add_argument("-iof", "--image_output_format", type=str, help="Image output format or codec (jpg, heif, libaom-av1)")
-parser.add_argument("-vof", "--video_output_format", type=str, help="Video output format or codec (mp4, mkv, mov, libx265)")
+parser.add_argument("-ioc", "--image_output_codec", type=str, help="Image output codec (mjpeg, png, libaom-av1, libwebp), look into your ffmpeg encoders for more codec.")
+parser.add_argument("-voc", "--video_output_codec", type=str, help="Video output codec (libx265, libx264, flv, wmv2), look into your ffmpeg encoders for more codec.")
 parser.add_argument("-m", "--media", type=str, choices=["image", "video"], help="Only process specified media type")
-parser.add_argument("-e", "--extension", type=str, help='Only process files with specified extensions (e.g., "jpg;png;mp4")')
+parser.add_argument("-e", "--extension", type=str, help='Only process files with specified extensions (e.g. "jpg;png;mp4")')
 parser.add_argument("-k", "--keep_temp", action="store_true", help='Keep temp files instead of deleting them after execution (large files in png format)')
-parser.add_argument("-r", "--allow_reprocess", action="store_true", help='Allow reprocessing files that are previously completed or flagged')
+parser.add_argument("-rp", "--allow_reprocess", action="store_true", help='Allow reprocessing files that are previously processed or flagged')
+parser.add_argument("-rf", "--retry_failed", action="store_true", help='Retry failed files (recommend on small batch of files)')
 args = parser.parse_args()
 
 
@@ -37,7 +38,8 @@ try:
         media = args.media,
         extension = args.extension.split(';') if isinstance(args.extension, str) else args.extension,
         keep_temp = args.keep_temp,
-        allow_reprocess = args.allow_reprocess
+        allow_reprocess = args.allow_reprocess,
+        retry_failed = args.retry_failed
     )
 except ValidationError as e:
     print(e)
