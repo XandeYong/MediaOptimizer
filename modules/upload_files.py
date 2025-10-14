@@ -1,5 +1,5 @@
-from main import container
-from classes.auth import Auth
+from mediaoptimizer import container
+from classes.google_auth import GoogleAuth
 from classes.path_manager import PathManager
 from components.my_logging import log_message
 import requests
@@ -7,13 +7,13 @@ import os
 
 # Injecting dependency
 path_manager: PathManager = container.path_manager
-settings: Auth = container.google_auth
+google_auth: GoogleAuth = container.google_auth
 
 # Set up API credentials
-ACCESS_TOKEN = settings.access_token_read
+ACCESS_TOKEN = google_auth.access_token_read
 HEADERS = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
-UPLOAD_URL = settings.upload_media_api
-CREATE_MEDIA_URL = settings.create_media_api
+UPLOAD_URL = google_auth.upload_media_api
+CREATE_MEDIA_URL = google_auth.create_media_api
 
 # Variables
 count_success = 0

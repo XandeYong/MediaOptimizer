@@ -8,7 +8,7 @@ from magic import magic
 from datetime import datetime, UTC
 from pathlib import Path
 from PIL import Image
-from main import container
+from mediaoptimizer import container
 from classes.argument import Argument
 from classes.path_manager import PathManager
 from components.file_manager import FileManager
@@ -38,8 +38,8 @@ pillow_heif.register_avif_opener()
 
 # file to skip (optimizing raw image is pointless, why take raw image in the first place)
 skip = ["image/tiff"]
-image_codec = args.image_output_format or "libaom-av1"
-video_codec = args.video_output_format or "libx265"
+image_codec = args.image_output_codec or "libaom-av1"
+video_codec = args.video_output_codec or "libx265"
 image_out_ext = ExtensionHelper.get_extension_from_codec(image_codec)
 video_out_ext = ExtensionHelper.get_extension_from_codec(video_codec)
 

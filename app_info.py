@@ -39,6 +39,10 @@ ENVIRONMENT = {
 - Handle mkv metadata modification
 - Description update on arguments (iof > ioc, vof > voc)
 
+1.2.1.0
+- Fixed image_output_codec and video_output_codec not working
+- rename main.py to mediaoptimizer.py
+
 [Future Release]
 1.x.0.0
 - Publish to Google Photos

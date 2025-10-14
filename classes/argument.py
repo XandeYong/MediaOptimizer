@@ -6,8 +6,8 @@ class Argument(BaseModel):
     source: Optional[str] = None
     image_quality: Optional[int] = None
     video_quality: Optional[int] = None
-    image_output_format: Optional[str] = None
-    video_output_format: Optional[str] = None
+    image_output_codec: Optional[str] = None
+    video_output_codec: Optional[str] = None
     media: Optional[str] = None
     extension: Optional[List[str]] = None
     keep_temp: bool

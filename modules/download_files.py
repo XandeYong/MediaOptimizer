@@ -1,4 +1,4 @@
-from main import container
+from mediaoptimizer import container
 from classes.google_auth import GoogleAuth
 from classes.path_manager import PathManager
 from components.my_logging import log_message
