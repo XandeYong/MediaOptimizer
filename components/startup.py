@@ -14,6 +14,7 @@ from components.file_manager import FileManager
 # Args handling
 parser = argparse.ArgumentParser(description="MediaOptimizer settings")
 parser.add_argument("-n", "--name", type=str, default="Manual", help="Operation name (default: 'Manual')")
+parser.add_argument("-o", "--operation", type=int, choices=[0,1,2], default=1, help='Operation: 0 = Optimize and Upload, 1 = Optimize only, 2 = Upload only (default: 1)')
 parser.add_argument("-s", "--source", type=str, help="Source folder path (skips manual input)")
 parser.add_argument("-iq", "--image_quality", type=int, help="Image quality (int value, depends on selected codec)")
 parser.add_argument("-vq", "--video_quality", type=int, help="Video quality (int value, depends on selected codec)")
@@ -30,6 +31,7 @@ args = parser.parse_args()
 try:
     args_model = Argument(
         name = args.name,
+        operation = args.operation,
         source = args.source,
         image_quality = args.image_quality,
         video_quality = args.video_quality,
@@ -59,12 +61,13 @@ tools = Tool(**config['tool'])
 # File Generation
 folder_path = FileManager.generate_folder_structure(name=args.name)
 log_file = FileManager.generate_file("log", folder_path, extension="txt")
-failed_file = FileManager.generate_file("fail", folder_path, extension="txt")
 failed_media_folder = FileManager.generate_folder_single("failed_media", folder_path)
 temp_media_folder = FileManager.generate_folder_single("temp_media", folder_path)
 optimized_media_folder = FileManager.generate_folder_single("optimized_media", folder_path)
 raw_media_folder = FileManager.generate_folder_single("raw_media", folder_path)
-path_manager = PathManager(folder_path, log_file, failed_file, failed_media_folder, temp_media_folder, optimized_media_folder, raw_media_folder)
+uploaded_media_folder = FileManager.generate_folder_single("uploaded_media", folder_path)
+failed_upload_media_folder = FileManager.generate_folder_single("failed_upload_media", folder_path)
+path_manager = PathManager(folder_path, log_file, failed_media_folder, temp_media_folder, optimized_media_folder, raw_media_folder, uploaded_media_folder, failed_upload_media_folder)
 
 # Init Manager
 google_api_manager = GoogleAPIManager(

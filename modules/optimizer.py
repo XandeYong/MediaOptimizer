@@ -265,7 +265,6 @@ def process(media: Path, count: int, mode: Mode):
 def exception_action(media, guid, e, mode):
     try:
         log_message(f"[{guid}] Error: {e}", path_manager.log)
-        log_message(f"[{guid}] Error: {e}", path_manager.failed_log)
 
         if mode == Mode.NORMAL:
             # copy file to failed_media folder

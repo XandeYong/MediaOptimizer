@@ -69,7 +69,6 @@ def download_media(media_items):
             thread.start()
         else:
             log_message(f"Failed: {file_name}", path_manager.log)
-            log_message(f"Failed: {file_name}", path_manager.failed_log)
             count_failed += 1
 
     log_message("Download process completed.", path_manager.log)

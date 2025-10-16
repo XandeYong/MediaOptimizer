@@ -1,6 +1,6 @@
 import os
 import requests
-import magic
+from magic import magic
 from pathlib import Path
 from http import HTTPStatus
 from datetime import datetime
@@ -16,7 +16,7 @@ class GoogleAPIManager:
     Handles OAuth2 credentials, uploads media files to Google servers,
     and creates media items in Google Photos via REST API.
 
-    # Not possible for fetch/download anymore due to (https://issuetracker.google.com/issues/368779600?pli=1)
+    ##### Not possible for fetch/download anymore due to (https://issuetracker.google.com/issues/368779600?pli=1)
     """
 
     def __init__(self, 
@@ -165,7 +165,8 @@ class GoogleAPIManager:
         self._ensure_token_valid()
         
         file_name = file_path.name
-        mime = magic.Magic(mime=True).from_file(str(file_path))
+        # mime = magic.Magic(mime=True).from_file(str(file_path))
+        mime = magic.from_file(str(file_path), mime=True)
 
         headers = self._auth_headers(
             content_type = "application/octet-stream",

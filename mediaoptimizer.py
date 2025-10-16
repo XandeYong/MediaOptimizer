@@ -45,7 +45,6 @@ if __name__ == "__main__":
     log_message("Media Optimizer application started.", path_manager.log)
     try:
         log_message(f"Log file path: {path_manager.log}", path_manager.log)
-        log_message(f"Fail file path: {path_manager.failed_log}", path_manager.log)
         log_message(f"Args: {args.model_dump_json()}", path_manager.log)
 
         # Perform Download
@@ -65,11 +64,14 @@ if __name__ == "__main__":
         log_message(f"Total files: {len(media_files)}, image: {image_count}, video: {video_count}", path_manager.log)
 
         # Perform Optimize
-        from modules.optimizer import process_medias
-        process_medias(media_files)
+        if args.operation in (0, 1):
+            from modules.optimizer import process_medias
+            process_medias(media_files)
 
         # Perform Upload
-
+        if args.operation in (0, 2):
+            from modules.upload_files import upload_all_medias
+            upload_all_medias(media_files if args.operation == 2 else [])
 
     except Exception as e:
         log_message(f"{e}", path_manager.log)

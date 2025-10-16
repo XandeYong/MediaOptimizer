@@ -1,5 +1,5 @@
 APP_NAME = "Media Optimizer"
-VERSION = "1.1.0.0"
+VERSION = "1.3.0.0"
 BUILD_DATE = "2025-07-18T10:00:00Z"
 AUTHOR = "XandeYong"
 
@@ -43,9 +43,13 @@ ENVIRONMENT = {
 - Fixed image_output_codec and video_output_codec not working
 - rename main.py to mediaoptimizer.py
 
+1.3.0.0
+- Publish media to Google Photos
+- Added 1 argument (operation) to allow user to choose operation between (0: all, 1: optimize only, 2: upload only)
+- Added 2 folders to manage uploaded and failed upload media
+
 [Future Release]
 1.x.0.0
-- Publish to Google Photos
 - Async version of optimizer part
 
 """
