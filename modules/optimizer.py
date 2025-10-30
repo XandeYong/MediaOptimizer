@@ -1,8 +1,10 @@
 import os
+import signal
 import uuid
 import shutil
 import cv2
 import pillow_heif
+import pillow_avif   # AVIF support for Pillow
 from app_info import APP_NAME, VERSION
 from magic import magic
 from datetime import datetime, UTC
@@ -18,6 +20,7 @@ from helper.timespan_logger import TimeSpanLogger
 from helper.extension_helper import ExtensionHelper
 from constants.media_mime_types import IMAGE_EXT, VIDEO_EXT
 from enum import Enum, auto
+from subprocess import TimeoutExpired
 
 # Global Param
 user_interrupt = False
@@ -27,6 +30,17 @@ class Mode(Enum):
     NORMAL = auto()
     RETRY = auto()
 
+class ProcessState(Enum):
+    PROCESSING = auto()
+    VERIFYING = auto()
+    OPTIMIZING = auto()
+    ROLLBACK = auto()
+    METADATA_RECOVERYING = auto()
+    METADATA_INJECTING = auto()
+    SUCCESS = auto()
+    SKIPPED = auto()
+    FAILED = auto()
+
 # Injecting dependency
 args: Argument = container.args
 path_manager: PathManager = container.path_manager
@@ -34,10 +48,12 @@ media_optimizer: MediaOptimizer = container.media_optimizer
 
 # Register HEIF support with Pillow
 pillow_heif.register_heif_opener()
-pillow_heif.register_avif_opener()
 
 # file to skip (optimizing raw image is pointless, why take raw image in the first place)
-skip = ["image/tiff"]
+SKIP_RAW = ["image/tiff", "image/x-adobe-dng"]
+UNKNOWN_MIME_TYPE = ["application/octet-stream", "inode/blockdevice"]
+FILE_GENERATED_STATE = {ProcessState.OPTIMIZING, ProcessState.ROLLBACK, ProcessState.METADATA_RECOVERYING, ProcessState.METADATA_INJECTING, ProcessState.SUCCESS}
+
 image_codec = args.image_output_codec or "libaom-av1"
 video_codec = args.video_output_codec or "libx265"
 image_out_ext = ExtensionHelper.get_extension_from_codec(image_codec)
@@ -83,10 +99,10 @@ def _verify(media_path: Path):
     mime: str = magic.from_file(str(media_path), mime=True)
     ext: str = media_path.suffix
 
-    if mime == "application/octet-stream" or mime == "inode/blockdevice":
+    if mime in UNKNOWN_MIME_TYPE:
         mime = media_optimizer.get_mime_type(media_path)
 
-    for m in skip:
+    for m in SKIP_RAW:
         if mime == m:
             return "raw", mime, ext
 
@@ -144,6 +160,8 @@ def _delete_file(file: Path, guid: str, category: str = "unnecessary"):
 def process(media: Path, count: int, mode: Mode):
     global user_interrupt
     success: bool = False
+    state: ProcessState = ProcessState.PROCESSING
+    output_path: Path = None
     guid = str(uuid.uuid4())
     timer = TimeSpanLogger()
     try:
@@ -157,12 +175,14 @@ def process(media: Path, count: int, mode: Mode):
 
         # Verify media type (Image/Video)
         log_message(f"[{guid}] Verifying media file...", path_manager.log)
+        state = ProcessState.VERIFYING
         media_format, mime_type, ext = _verify(media)
         log_message(f"[{guid}] format: [{media_format}], mime: [{mime_type}], ext: [{media.suffix}]", path_manager.log)
 
         # Check Raw
         if media_format == "raw":
             log_message(f"[{guid}] Raw media shouldn't be optimize.", path_manager.log)
+            state = ProcessState.SKIPPED
             shutil.copy2(media, path_manager.raw_media)
             success = True
             return   # Escape
@@ -177,6 +197,7 @@ def process(media: Path, count: int, mode: Mode):
 
         # Verify reprocessing file
         if not args.allow_reprocess and media_optimizer.read_custom_xmp_tag(media.absolute(), "MediaOptimizer", "Optimizer_Toolkit"):
+            state = ProcessState.SKIPPED
             raise RecursionError(f"Media have been optimized before.")
 
         # HEIF handling (tile grid (image collection))
@@ -188,7 +209,8 @@ def process(media: Path, count: int, mode: Mode):
         # Optimize the media file
         log_message(f"[{guid}] Optimizing media...", path_manager.log)
         output_ext = image_out_ext if (media_format == "image") else video_out_ext
-        output_path: Path = Path(f"{path_manager.optimized_media}/{media.stem}{output_ext}")
+        output_path = Path(f"{path_manager.optimized_media}/{media.stem}{output_ext}")
+        state = ProcessState.OPTIMIZING
         try:
             _optimize(
                 temp.absolute() if temp else media.absolute(), 
@@ -198,11 +220,11 @@ def process(media: Path, count: int, mode: Mode):
             )
         except Exception as e:
             raise e
-
         log_message(f"[{guid}] Optimized. output: [{output_path}]", path_manager.log)
 
         # Recover metadata
         log_message(f"[{guid}] Recover metadata...", path_manager.log)
+        state = ProcessState.METADATA_RECOVERYING
         _metadata_recovery(media, guid, output_path)
 
         # Verify proficiency
@@ -212,6 +234,7 @@ def process(media: Path, count: int, mode: Mode):
         reduction_percentage = ((original_size - optimized_size) / original_size) * 100
         if optimized_size > original_size:
             log_message(f"[{guid}] Media shouldn't be optimize any further.", path_manager.log)
+            state = ProcessState.ROLLBACK
             optimize = False
 
             # remove the generated file
@@ -226,6 +249,7 @@ def process(media: Path, count: int, mode: Mode):
 
         # Modify media's metadata
         log_message(f"[{guid}] Altering metadata...", path_manager.log)
+        state = ProcessState.METADATA_INJECTING
         
         # Register xmp namespace and modify metadata
         _set_metadata(output_path, guid, {
@@ -248,32 +272,51 @@ def process(media: Path, count: int, mode: Mode):
             _delete_file(temp, guid, "temporary")
 
         success = True
+        log_message(f"[{guid}] Successfully optimized media: {media.name}.", path_manager.log)
+        state = ProcessState.SUCCESS
     except KeyboardInterrupt as e:
-        if not str(e).strip():
-            e = "User Interrupted."
-        exception_action(media, guid, e, mode)
+        e = "User Interrupted." if not str(e).strip() else e
+
+        # subprocess cleanup
+        previous_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)   # Temporarily ignore signal during cleanup
+        try:
+            if getattr(media_optimizer, "_pbar", None) and not media_optimizer._pbar.disable:
+                media_optimizer._pbar.close()
+            media_optimizer._subprocess.wait(timeout=5)
+        except TimeoutExpired:
+            media_optimizer._subprocess.kill()
+            media_optimizer._subprocess.wait()
+        except Exception:
+            pass                                                          # Indicate that there is no subprocess to clean up
+        finally:
+            signal.signal(signal.SIGINT, previous_handler)                # Restore normal signal behavior
+
+        exception_action(media, guid, e, mode, state, output_path)
         user_interrupt = True
+        log_message(f"[{guid}] Clean Up completed", path_manager.log)
 
     except Exception as e:
-        exception_action(media, guid, e, mode)
+        exception_action(media, guid, e, mode, state, output_path)
     finally:
         timer.stop()
         log_message(f"[{guid}] End process. Elapsed: {timer}", path_manager.log)
         return success
 
 # Core exception action
-def exception_action(media, guid, e, mode):
+def exception_action(media, guid, e, mode, state, output_path):
     try:
-        log_message(f"[{guid}] Error: {e}", path_manager.log)
+        log_message(f"[{guid}] Error: {e}, State: {state}", path_manager.log)
 
         if mode == Mode.NORMAL:
             # copy file to failed_media folder
             shutil.copy2(media, path_manager.failed_media)
 
         # delete file that are failed during the process in optimized_media folder
-        failed_file = Path(path_manager.optimized_media / media.name)
-        _delete_file(failed_file, guid, "failed")
+        if state in FILE_GENERATED_STATE:
+            failed_file = Path(path_manager.optimized_media / output_path.name)
+            _delete_file(failed_file, guid, "failed")
 
+        state = ProcessState.FAILED
     except Exception as err:
         log_message(f"[{guid}] exception_action failed: {err}", path_manager.log)
 

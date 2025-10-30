@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from dependency_injector import containers, providers
 from classes.google_auth import GoogleAuth
 from classes.tools import Tool
+from classes.google_photos import GooglePhotos
 from classes.argument import Argument
 from classes.path_manager import PathManager
 from components.google_api_manager import GoogleAPIManager
@@ -55,6 +56,7 @@ with open('config.json', 'r') as file:
     config = json.load(file)
 
 google_auth = GoogleAuth(**config['google_auth'])
+google_photos = GooglePhotos(**config.get('google_photos', {}))
 tools = Tool(**config['tool'])
 
 
@@ -96,6 +98,7 @@ class Container(containers.DeclarativeContainer):
     google_api_manager = providers.Singleton(GoogleAPIManager)
     media_optimizer = providers.Singleton(MediaOptimizer)
     google_auth = providers.Singleton(GoogleAuth)
+    google_photos = providers.Singleton(GooglePhotos)
     tools = providers.Singleton(Tool)
     args = providers.Singleton(Argument)
 
@@ -104,5 +107,6 @@ container.path_manager = path_manager
 container.google_api_manager = google_api_manager
 container.media_optimizer = media_optimizer
 container.google_auth = google_auth
+container.google_photos = google_photos
 container.tools = tools
 container.args = args_model

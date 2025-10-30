@@ -47,9 +47,16 @@ ENVIRONMENT = {
 - Publish media to Google Photos
 - Added 1 argument (operation) to allow user to choose operation between (0: all, 1: optimize only, 2: upload only)
 - Added 2 folders to manage uploaded and failed upload media
+- Removed failed_log file
+- Allow single file optimization and upload to Google Photos
+- Fixed AVIF optimization issue
+- Fixed failed to delete incomplete optimized media file when optimization failed
+- Fixed video optimization interruption issue (subprocess not handled properly)
+- Created 2 test cases (test_extension.py, test_magic.py) and added test data files
+- Added pyproject.toml for project management
 
 [Future Release]
-1.x.0.0
+x.x.0.0
 - Async version of optimizer part
 
 """

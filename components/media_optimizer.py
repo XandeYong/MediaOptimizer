@@ -12,6 +12,7 @@ class MediaOptimizer:
         self._exiftool:str = exiftool
         self._xmp_config:str = xmp_config
         self._subprocess:subprocess
+        self._pbar:tqdm
 
     #region Loader
     def load_executable(self, ffmpeg=None, ffprobe=None, exiftool=None):
@@ -174,6 +175,9 @@ class MediaOptimizer:
         self._subprocess = process
         process.wait()
 
+        if process.returncode != 0:
+            raise RuntimeError(process.stderr.read().decode())
+
         # subprocess.run(cmd, check=True)
         os.utime(output_path, (mod_time, mod_time))
 
@@ -187,7 +191,7 @@ class MediaOptimizer:
                 "format=duration", "-of",
                 "default=noprint_wrappers=1:nokey=1", filepath
         ]
-        print(cmd)
+        # print(cmd)
         result = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
@@ -261,6 +265,11 @@ class MediaOptimizer:
             "-map_metadata", "0",    # Keep original metadata
         ]
 
+        if output_path.suffix == ".mp4":
+            cmd += [
+                "-dn",               # Remove data streams, which are not supported in mp4 container
+            ]
+
         # Optional resolution scaling
         if scale_resolution:
             cmd += ["-vf", f"scale={scale_resolution}"]
@@ -280,23 +289,22 @@ class MediaOptimizer:
         # Set output location
         cmd.append(output_path)
 
-        # print(cmd)
+        print(cmd)
 
         # Run FFmpeg and parse progress
-        process = subprocess.Popen(
+        self._subprocess = process = subprocess.Popen(
             cmd,
             stderr=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             universal_newlines=True,
             bufsize=1
         )
-        self._subprocess = process
 
         time_pattern = re.compile(r"time=(\d+):(\d+):(\d+).(\d+)")
-        pbar = tqdm(total=total_duration, unit="s", desc="Encoding")
+        self._pbar = pbar = tqdm(total=total_duration, unit="s", desc="Encoding")
 
         for line in process.stderr:
-            match = time_pattern.search(line)
+            match = time_pattern.search(line)   
             if match:
                 h, m, s, ms = map(int, match.groups())
                 current_time = h * 3600 + m * 60 + s + ms / 100.0
@@ -307,6 +315,8 @@ class MediaOptimizer:
         pbar.n = total_duration
         pbar.refresh()
         pbar.close()
+
+        print(process)
         
         if process.returncode != 0:
             raise RuntimeError(f"FFmpeg failed:\n{line}")

@@ -164,14 +164,14 @@ class GoogleAPIManager:
         # Keep token alive
         self._ensure_token_valid()
         
-        file_name = file_path.name
+        filename = file_path.name
         # mime = magic.Magic(mime=True).from_file(str(file_path))
         mime = magic.from_file(str(file_path), mime=True)
 
         headers = self._auth_headers(
             content_type = "application/octet-stream",
             extra_headers = {
-                "X-Goog-Upload-File-Name": file_name,
+                "X-Goog-Upload-File-Name": filename,
                 "X-Goog-Upload-Content-Type": mime,
                 "X-Goog-Upload-Protocol": "raw",
             }
@@ -186,9 +186,9 @@ class GoogleAPIManager:
 
             return upload_response.text.strip() # Upload Token
         except ConnectionError as e:
-            raise Exception(f"Upload token request failed for {file_name}: {e}")
+            raise Exception(f"Upload token request failed for {filename}: {e}")
         except Exception as e:
-            raise Exception(f"Error reading file {file_name}: {e}")
+            raise Exception(f"Error reading file {filename}: {e}")
 
 
     # Create media file from google server
@@ -225,5 +225,9 @@ class GoogleAPIManager:
         ]
 
         response = requests.post(self._create_media_api, headers=headers, json=payload)
-        return response.text
+
+        if response.status_code != HTTPStatus.OK:
+            raise ConnectionError(response.text)
+        
+        return response
     #endregion

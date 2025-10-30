@@ -12,7 +12,7 @@ args: Argument = container.args
 path_manager: PathManager = container.path_manager
 google_auth: GoogleAuth = container.google_auth
 
-def sort_ext(extensions: list[str]):
+def set_supported_ext(extensions: list[str]):
     image_ext = []
     video_ext = []
     unsupported_extension = []
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         log_message(f"Source: {source}", path_manager.log)
         
         # Filter media
-        image_ext, video_ext = sort_ext(args.extension)
+        image_ext, video_ext = set_supported_ext(args.extension)
         media_files, image_count, video_count = FileManager.collect_media_files(Path(source), image_ext, video_ext, args.media)
 
         # print(media_files)
