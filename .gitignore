@@ -186,7 +186,7 @@ cython_debug/
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
 #  and can be added to the global gitignore or merged into this file. However, if you prefer, 
 #  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+.vscode/
 
 # Ruff stuff:
 .ruff_cache/
@@ -209,12 +209,10 @@ __marimo__/
 
 # MediaOptimizer 
 #  optimized is the output of testcase i made
-#  test is ignored due to a lot of personal data i hardcoded in it, so will not release before i clean them up
 #  temp is some random note and old design i have in this project, will clean up in future as well
 #  config.json, client_secret.json, token.json are all personal secret files
 #  ffmpeg are larger than 100mb, github doesn't allow commiting large files with basic account
 temp/
-test/
 optimized/
 output/*
 config.json

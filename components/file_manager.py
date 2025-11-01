@@ -108,22 +108,29 @@ class FileManager:
         def found(file):
             media_files.append(file)
             return 1
-
-        for file_path in root_dir.rglob('*'):
+        
+        def filter_ext(file_path: Path):
+            nonlocal image_count, video_count
             if not file_path.is_file():
-                continue
+                return
             ext = file_path.suffix.lower()
             if ext in image_exts:
                 image_count += found(file_path)
             elif ext in video_exts:
                 video_count += found(file_path)
 
+        if root_dir.is_file():
+            filter_ext(root_dir)
+        else:
+            for file_path in root_dir.rglob('*'):
+                filter_ext(file_path)
+
         return media_files, image_count, video_count
 
     @staticmethod
     def delete_file(file: Path):
         try:
-            file.unlink(missing_ok=True)
+            file.unlink()
             return True, "Success"
         except Exception as e:
             return False, str(e)

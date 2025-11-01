@@ -1,95 +1,101 @@
+import shutil
+import uuid
+from classes.argument import Argument
+from classes.google_photos import GooglePhotos
 from mediaoptimizer import container
-from classes.google_auth import GoogleAuth
 from classes.path_manager import PathManager
+from components.google_api_manager import GoogleAPIManager
 from components.my_logging import log_message
-import requests
-import os
+from helper.timespan_logger import TimeSpanLogger
+from pathlib import Path
 
 # Injecting dependency
 path_manager: PathManager = container.path_manager
-google_auth: GoogleAuth = container.google_auth
-
-# Set up API credentials
-ACCESS_TOKEN = google_auth.access_token_read
-HEADERS = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
-UPLOAD_URL = google_auth.upload_media_api
-CREATE_MEDIA_URL = google_auth.create_media_api
+google_api_manager: GoogleAPIManager = container.google_api_manager
+google_photos: GooglePhotos = container.google_photos
+args: Argument = container.args
 
 # Variables
 count_success = 0
 count_failed = 0
 
-def upload_photo(file_path):
-    file_name = os.path.basename(file_path)
-    print(file_name)
-    exit()
-
-    # Step 1: Upload the file to get an upload token
-    log_message(f"Uploading {file_name} to get upload token...", path_manager.log)
-    headers = {
-        **HEADERS,
-        "Content-Type": "application/octet-stream",
-        "X-Goog-Upload-File-Name": file_name,
-        "X-Goog-Upload-Protocol": "raw",
-    }
-
-    try:
-        with open(file_path, "rb") as file:
-            upload_response = requests.post(UPLOAD_URL, headers=headers, data=file)
-
-        if upload_response.status_code != 200:
-            log_message(f"Upload token request failed for {file_name}: {upload_response.text}", path_manager.failed_log)
-            return None
-
-        return upload_response.text.strip()  # This is the upload token
-    except Exception as e:
-        log_message(f"Error reading file {file_name}: {e}", path_manager.failed_log)
-        return None
-
-def create_media_item(upload_token, file_name):
-    global count_success, count_failed
-
-    payload = {
-        "newMediaItems": [
-            {
-                "description": f"Uploaded: {file_name}",
-                "simpleMediaItem": {
-                    "uploadToken": upload_token
-                }
-            }
-        ]
-    }
-
-    response = requests.post(CREATE_MEDIA_URL, headers=HEADERS, json=payload)
-
-    if response.status_code == 200:
-        log_message(f"Successfully created media item: {file_name}", path_manager.log)
-        count_success += 1
+def _move_file(media: Path, dest: Path):
+    if args.operation == 2:
+        shutil.copy2(media, dest)
     else:
-        log_message(f"Failed to create media item: {file_name}", path_manager.failed_log)
-        log_message(f"Error: {response.text}", path_manager.failed_log)
-        count_failed += 1
+        shutil.move(media, dest)
 
-def upload_all_photos():
-    log_message("Upload process started.", path_manager.log)
+def _upload_media(media: Path, count: int):
+    success: bool = False
+    guid = str(uuid.uuid4())
+    timer = TimeSpanLogger()
+    try:
+        log_message(f"[{guid}] Start processing file: [{count}], media: [{media.name}], path: [{media.absolute()}]", path_manager.log)
+        timer.start()
 
-    for file_name in os.listdir(path_manager.optimized_media):
-        file_path = path_manager.failed_media / file_name
+        # Upload media to google server and retrieve upload token
+        log_message(f"[{guid}] Uploading media file...", path_manager.log)
+        upload_token = google_api_manager.upload_media(media)
+        log_message(f"[{guid}] upload_token: {upload_token}", path_manager.log)
 
-        if not file_path.is_file():
-            continue
+        # Validate upload token
+        if upload_token == "":
+            raise Exception("Upload token is empty.")
+        
+        # Create media item from upload token
+        log_message(f"[{guid}] Creating media item...", path_manager.log)
+        response = google_api_manager.create_media_item(upload_token, media.name, google_photos.album_id)
 
-        log_message(f"Processing file: {file_name}", path_manager.log)
-        upload_token = upload_photo(file_path)
+        log_message(f"[{guid}] Response: {response.json()}", path_manager.log)
+        
+        # Move file to uploaded folder
+        log_message(f"[{guid}] Moving media file...", path_manager.log)
+        _move_file(media, path_manager.uploaded_media)
+        
+        success = True
+        log_message(f"[{guid}] Successfully uploaded media: {media.name}.", path_manager.log)
 
-        if upload_token:
-            create_media_item(upload_token, file_name)
-        else:
-            count_failed += 1
+    except Exception as e:
+        log_message(f"[{guid}] Error: {e}", path_manager.log)
+        _move_file(media, path_manager.failed_upload_media)
+    finally:
+        timer.stop()
+        log_message(f"[{guid}] End process. Elapsed: {timer}", path_manager.log)
+        return success
 
-    log_message(f"Upload Summary:\nSuccess: {count_success}\nFailed: {count_failed}\nTotal: {count_success + count_failed}", path_manager.log)
-    log_message("Upload process ended.", path_manager.log)
+def upload_all_medias(media_files: list[Path]):
+    count: int = 1
+    count_failed = 0
+    try:
+        log_message("Upload process started - Google Photos", path_manager.log)
+        uploader_timer = TimeSpanLogger()
+        uploader_timer.start()
+
+        # If no media files provided, upload all from optimized_media folder
+        if media_files == []:
+            optimized_medias = Path(path_manager.optimized_media)
+            media_files = [Path(media) for media in optimized_medias.iterdir()]
+        print(media_files)
+
+        for media in media_files:
+            success = _upload_media(media, count)
+            count += 1
+
+            if not success:
+                count_failed += 1
+
+        # Adjust count to be the total number of files processed
+        count -= 1
+
+    except Exception as e:
+        log_message(f"{e}", path_manager.log)
+    finally:
+        uploader_timer.stop()
+        log_message(f"Upload process ended - Google Photos. Elapsed: {uploader_timer}", path_manager.log)
+        log_message(f"Upload Summary: Success: {count - count_failed}, Failed: {count_failed}, Total: {count}", path_manager.log)
+
+
 
 # MAIN (Manual Run)
 if __name__ == "__main__":
-    upload_all_photos()
+    upload_all_medias()

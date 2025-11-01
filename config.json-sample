@@ -13,7 +13,9 @@
             "media_create_url": "https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate"
         }
     },
-    "album_id": "",
+    "google_photos": {
+        "album_id": ""
+    },
     "tool": {
         "ffmpeg": "./ffmpeg-7.1.1/bin/ffmpeg.exe",
         "ffprobe": "./ffmpeg-7.1.1/bin/ffprobe.exe",

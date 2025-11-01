@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 class Argument(BaseModel):
     name: Optional[str] = None
+    operation: Optional[int] = None
     source: Optional[str] = None
     image_quality: Optional[int] = None
     video_quality: Optional[int] = None
