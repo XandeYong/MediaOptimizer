@@ -56,6 +56,9 @@ ENVIRONMENT = {
 - Added pyproject.toml for project management
 - Added test data files for test cases
 
+1.3.1.0
+- fixed issue where rollback file with same name will always fail
+
 [Future Release]
 x.x.0.0
 - Async version of optimizer part

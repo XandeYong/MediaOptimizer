@@ -243,7 +243,7 @@ def process(media: Path, count: int, mode: Mode):
             # rollback to the previous file
             rollback_media = Path(shutil.copy2(media, path_manager.optimized_media))
             print(f"media: {media}, copied path: {rollback_media}")
-            if output_path is not rollback_media:
+            if output_path.name is not rollback_media.name:
                 _delete_file(output_path, guid, "generated")
                 output_path = rollback_media
 
